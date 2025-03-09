@@ -1,0 +1,46 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+		},
+		{
+			"path": "C:\\SDK\\Odin\\core",
+		},
+		{
+			"path": "C:\\SDK\\Odin\\base"
+		},
+	],
+	"build_systems":
+	[
+		{
+			"name": "Odin + Sokol + Hot Reload template",
+			"working_dir": "$project_path",
+			"shell_cmd": "python build.py -hot-reload -run -debug",
+			
+			// This makes sublime able to jump to build errors.
+			"file_regex": "^(.+)\\(([0-9]+):([0-9]+)\\) (.+)$",
+			
+			"variants": [
+				{
+					"name": "release",
+					"shell_cmd": "python build.py -release -run",
+				},
+				{
+					"name": "web",
+					"shell_cmd": "python build.py -web -emsdk-path C:\\sdk\\emsdk",
+				},
+			],
+		}
+	],
+	"settings":
+	{
+		"LSP":
+		{
+			"odin":
+			{
+				"enabled": true,
+			},
+		},
+	},
+}
