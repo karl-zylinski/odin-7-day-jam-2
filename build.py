@@ -344,7 +344,7 @@ def build_web():
 	execute(emcc_command)
 
 	# Not needed
-	os.remove(os.path.join(out_dir, "game.wasm.o"))
+	os.remove(os.path.join(out_dir, "gamegame.wasm.o"))
 
 def execute(cmd):
 	res = os.system(cmd)

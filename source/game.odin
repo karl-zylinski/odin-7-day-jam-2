@@ -4,12 +4,13 @@ import "core:math/linalg"
 import "core:slice"
 import "core:math"
 import "core:fmt"
-import "core:math/ease"
 import sapp "sokol/app"
 import sg "sokol/gfx"
 import sglue "sokol/glue"
 import slog "sokol/log"
 import sshape "sokol/shape"
+
+_ :: fmt
 
 Game_Memory :: struct {
 	pip: sg.Pipeline,
@@ -17,8 +18,6 @@ Game_Memory :: struct {
 	models: [dynamic]Model,
 	objects: [dynamic]Object,
 	player: Player,
-	touch_prev: Vec2,
-	touching: bool,
 	fov_offset: f32,
 	time: f64,
 }
@@ -85,7 +84,7 @@ create_easers :: proc() {
 		},
 		ease = proc(t: f32) -> f32 {
 			return 1 - (1 - t) * (1 - t)
-		}
+		},
 	}
 
 	g.player.fov_easer = {
@@ -135,7 +134,7 @@ game_init :: proc() {
 	})
 
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
-	add_box(pos = {5, -1, 10}, size = {3, 1, 10}, color = {255, 255, 255, 255})
+	add_box(pos = {5, -1, 10}, size = {3, 1, 10},  color = {255, 255, 255, 255})
 	add_box(pos = {-5, 0, 0},  size = {1, 10, 50}, color = {255, 255, 255, 255})
 	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
 	add_box(pos = {0, -1, 10}, size = {5, 1, 5},   color = {0, 255, 0, 255})
@@ -214,19 +213,44 @@ game_frame :: proc() {
 		easer_set_state(&p.roll_easer, Strafe_State.None)
 	}
 
+	if left_touching {
+		THRESHOLD :: 5
+		if left_touch_offset.x < -THRESHOLD {
+			movement.x -= 1
+		}
+
+		if left_touch_offset.x > THRESHOLD {
+			movement.x += 1
+		}
+
+		if left_touch_offset.y > THRESHOLD {
+			movement.z += 1
+		}
+
+		if left_touch_offset.y < -THRESHOLD {
+			movement.z -= 1
+		}
+	}
+
 	p.roll = easer_update(&p.roll_easer, dt)
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
 	p.vel.xz = linalg.mul(rot, vec4_point(linalg.normalize0(movement)*dt*600)).xz
 	
-	if sapp.mouse_locked() || g.touching {
+	if sapp.mouse_locked() {
 		p.yaw -= mouse_move.x * dt * 0.05
 		p.pitch += mouse_move.y * dt * 0.05
 
-		p.pitch = clamp(p.pitch, -0.1, 0.2)
 	} else if mouse_held[.Left] {
 		sapp.lock_mouse(true)
 	}
+
+	if right_touching {
+		p.yaw -= right_touch_diff.x * dt * 0.05
+		p.pitch += right_touch_diff.y * dt * 0.05
+	}
+	
+	p.pitch = clamp(p.pitch, -0.1, 0.2)
 
 	mouse_move = {}
 

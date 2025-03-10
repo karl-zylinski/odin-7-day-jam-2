@@ -1,7 +1,6 @@
 package game
 
 import sapp "sokol/app"
-import "core:slice"
 
 Key :: enum {
 	None,
@@ -31,6 +30,14 @@ Mouse_Button :: enum {
 
 mouse_held: [Mouse_Button]bool
 mouse_move: [2]f32
+
+left_touch_origin: Vec2
+right_touch_prev: Vec2
+left_touching: bool
+right_touching: bool
+
+left_touch_offset: Vec2
+right_touch_diff: Vec2
 
 process_input :: proc(e: ^sapp.Event) {
 	#partial switch e.type {
@@ -87,17 +94,46 @@ process_input :: proc(e: ^sapp.Event) {
 			}
 
 		case .TOUCHES_BEGAN:
-			g.touch_prev = { e.touches[0].pos_x, e.touches[0].pos_y }
-			g.touching = true
+			for tidx in 0..<e.num_touches {
+				t := e.touches[tidx]
+				pos := Vec2 {t.pos_x, t.pos_y}
+
+				if pos.x < sapp.widthf()/2 {
+					left_touch_origin = pos
+					left_touching = true
+				} else {
+					right_touch_prev = pos
+					right_touching = true
+				}
+			}
 
 		case .TOUCHES_MOVED:
-			cur := Vec2{ e.touches[0].pos_x, e.touches[0].pos_y }
-			diff := cur - g.touch_prev
-			g.touch_prev = cur
+			for tidx in 0..<e.num_touches {
+				t := e.touches[tidx]
+				pos := Vec2 {t.pos_x, t.pos_y}
 
-			mouse_move += diff
+				if pos.x < sapp.widthf()/2 {
+					diff := left_touch_origin - pos
+					left_touch_offset = diff
+				} else {
+					diff := pos - right_touch_prev
+					right_touch_prev = pos
+					right_touch_diff = diff
+				}
+			}
+
+
 		case .TOUCHES_ENDED:
-			g.touching = false
+			for tidx in 0..<e.num_touches {
+				t := e.touches[tidx]
+				pos := Vec2 {t.pos_x, t.pos_y}
+
+				if pos.x < sapp.widthf()/2 {
+					left_touching = false
+				} else {
+					right_touching = false
+				}
+			}
 	}
 }
 
