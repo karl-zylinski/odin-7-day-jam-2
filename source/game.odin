@@ -31,15 +31,18 @@ Player :: struct {
 	vel: Vec3,
 	jumping: bool,
 	roll_easer: Easer(Strafe_State),
-	strafe_state: Strafe_State,
-	strafe_state_time: f32,
-	strafe_state_start: f32,
+	fov_easer: Easer(Run_State),
 }
 
 Strafe_State :: enum {
 	None,
 	Left,
 	Right,
+}
+
+Run_State :: enum {
+	Still,
+	Running,
 }
 
 g: ^Game_Memory
@@ -79,6 +82,17 @@ create_easers :: proc() {
 			return 1 - (1 - t) * (1 - t)
 		}
 	}
+
+	g.player.fov_easer = {
+		end_values = {
+			.Still = 0,
+			.Running = 10,
+		},
+		duration = 0.4,
+		ease = proc(t: f32) -> f32 {
+			return 1 - (1 - t) * (1 - t) * (1 - t) * (1 - t)
+		},
+	}
 }
 
 @export
@@ -114,7 +128,7 @@ game_init :: proc() {
 	})
 
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
-	add_box(pos = {4, -1, 10}, size = {4, 1, 10}, color = {255, 255, 255, 255})
+	add_box(pos = {5, -1, 10}, size = {3, 1, 10}, color = {255, 255, 255, 255})
 	add_box(pos = {-5, 0, 0},  size = {1, 10, 50}, color = {255, 255, 255, 255})
 	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
 	add_box(pos = {0, -1, 10}, size = {5, 1, 5},   color = {0, 255, 0, 255})
@@ -159,15 +173,14 @@ game_frame :: proc() {
 
 	movement: Vec3
 	
-	FOV_OFFSET_MAX :: 5
-	FOV_OFFSET_SPEED :: 50
-
 	if key_held[.Forward] {
 		movement.z += 1
-		g.fov_offset = clamp(g.fov_offset + FOV_OFFSET_SPEED * dt, -FOV_OFFSET_MAX, FOV_OFFSET_MAX)
+		easer_set_state(&p.fov_easer, Run_State.Running)
 	} else {
-		g.fov_offset *= 0.9
+		easer_set_state(&p.fov_easer, Run_State.Still)
 	}
+
+	g.fov_offset = easer_update(&p.fov_easer, dt)
 	
 	if key_held[.Backward] {
 		movement.z -= 1
@@ -183,14 +196,14 @@ game_frame :: proc() {
 		easer_set_state(&p.roll_easer, Strafe_State.Right)
 	}
 
-	if !key_held[.Right] && !key_held[.Left] {
+	if movement.x == 0 {
 		easer_set_state(&p.roll_easer, Strafe_State.None)
 	}
 
 	p.roll = easer_update(&p.roll_easer, dt)
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
-	p.vel.xz = linalg.mul(rot, vec4_point(linalg.normalize0(movement)*dt*400)).xz
+	p.vel.xz = linalg.mul(rot, vec4_point(linalg.normalize0(movement)*dt*600)).xz
 	
 	if sapp.mouse_locked() || g.touching {
 		p.yaw -= mouse_move.x * dt * 0.05
@@ -283,7 +296,7 @@ game_frame :: proc() {
 		}
 
 		fs_params := Fs_Params {
-			sun = {0, 3, f32(math.sin(g.time))*3},
+			sun = {f32(math.cos(g.time)*2)*1, 3, f32(math.sin(g.time)*5)*2},
 			model_color = color_normalize(o.color),
 		}
 

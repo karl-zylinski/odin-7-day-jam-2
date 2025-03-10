@@ -40,7 +40,7 @@ out vec4 frag_color;
 
 void main() {
     vec3 sun_dir = normalize(sun - world_pos);
-    float l = max(dot(normalize(fs_normal), sun_dir), 0.4);
+    float l = max(dot(normalize(fs_normal), sun_dir)*1.5, 0.4);
     vec3 l3 = vec3(l, l*0.9, l*0.9);
     frag_color = vec4(model_color.rgb*l3,1);
 }
