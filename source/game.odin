@@ -17,6 +17,7 @@ Game_Memory :: struct {
 	player: Player,
 	touch_prev: Vec2,
 	touching: bool,
+	fov_offset: f32,
 }
 
 Player :: struct {
@@ -85,6 +86,7 @@ game_init :: proc() {
 	})
 
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
+	add_box(pos = {-5, 0, 0},   size = {1, 10, 50}, color = {255, 255, 255, 255})
 	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
 	add_box(pos = {0, -1, 10}, size = {5, 1, 5},   color = {0, 255, 0, 255})
 	add_box(pos = {0, 0, 15},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
@@ -126,11 +128,17 @@ game_frame :: proc() {
 	p.vel += {0, -9.82, 0} * dt
 
 	movement: Vec3
+	
+	FOV_OFFSET_MAX :: 5
+	FOV_OFFSET_SPEED :: 50
 
 	if key_held[.Forward] {
 		movement.z += 1
+		g.fov_offset = clamp(g.fov_offset + FOV_OFFSET_SPEED * dt, -FOV_OFFSET_MAX, FOV_OFFSET_MAX)
+	} else {
+		g.fov_offset *= 0.9
 	}
-
+	
 	if key_held[.Backward] {
 		movement.z -= 1
 	}
@@ -227,7 +235,8 @@ game_frame :: proc() {
 		g.bind.index_buffer = m.ibuf
 		sg.apply_bindings(g.bind)
 		model_transf := create_model_matrix(o.pos, o.rot, o.scl)
-		mvp := create_projection_matrix(sapp.widthf(), sapp.heightf()) * create_view_matrix(p.pos, p.yaw, p.pitch) * model_transf
+		view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch)
+		mvp := create_projection_matrix((60 + g.fov_offset)  * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf()) * view_matrix * model_transf
 
 		vs_params := Vs_Params {
 			mvp = mvp,

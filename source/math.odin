@@ -25,7 +25,7 @@ create_view_matrix :: proc(pos: Vec3, yaw: f32, pitch: f32) -> Mat4 {
 	return linalg.matrix4_look_at(pos, look, Vec3{0.0, 1.0, 0.0})
 }
 
-create_projection_matrix :: proc(render_width, render_height: f32) -> Mat4 {
+create_projection_matrix :: proc(fovy: f32, render_width, render_height: f32) -> Mat4 {
 	ar := abs(render_height) > 000.1 ? render_width / render_height : 1
-	return linalg.matrix4_perspective(60.0 * linalg.RAD_PER_DEG, ar, 0.01, 1000.0)
+	return linalg.matrix4_perspective(fovy, ar, 0.01, 1000.0)
 }
