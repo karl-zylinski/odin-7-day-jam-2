@@ -238,7 +238,7 @@ game_frame :: proc() {
 
 	p.roll = easer_update(&p.roll_easer, dt)
 
-	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
+	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, 0, 0)
 	p.vel.xz = linalg.mul(rot, vec4_point(movement*dt*600)).xz
 	
 	if sapp.mouse_locked() {
