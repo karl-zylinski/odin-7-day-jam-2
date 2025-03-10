@@ -30,6 +30,7 @@ Player :: struct {
 	pos: Vec3,
 	vel: Vec3,
 	jumping: bool,
+	roll_easer: Easer(Strafe_State),
 	strafe_state: Strafe_State,
 	strafe_state_time: f32,
 	strafe_state_start: f32,
@@ -63,6 +64,20 @@ game_app_default_desc :: proc() -> sapp.Desc {
 		logger = { func = slog.func },
 		html5_update_document_title = true,
 		high_dpi = true,
+	}
+}
+
+create_easers :: proc() {
+	g.player.roll_easer = {
+		end_values = {
+			.None = 0,
+			.Left = -0.015,
+			.Right = 0.015,
+		},
+		duration = 0.3,
+		ease = proc(t: f32) -> f32 {
+			return 1 - (1 - t) * (1 - t)
+		}
 	}
 }
 
@@ -160,48 +175,19 @@ game_frame :: proc() {
 
 	if key_held[.Left] {
 		movement.x += 1
-		if p.strafe_state != .Left {
-			p.strafe_state = .Left
-			p.strafe_state_start = p.roll
-			p.strafe_state_time = 0
-		}
+		easer_set_state(&p.roll_easer, Strafe_State.Left)
 	}
 
 	if key_held[.Right] {
 		movement.x -= 1
-
-		if p.strafe_state != .Right {
-			p.strafe_state = .Right
-			p.strafe_state_start = p.roll
-			p.strafe_state_time = 0
-		}
+		easer_set_state(&p.roll_easer, Strafe_State.Right)
 	}
 
 	if !key_held[.Right] && !key_held[.Left] {
-		if p.strafe_state != .None {
-			p.strafe_state = .None
-			p.strafe_state_start = p.roll
-			p.strafe_state_time = 0
-		}
+		easer_set_state(&p.roll_easer, Strafe_State.None)
 	}
 
-	p.strafe_state_time += dt
-	roll_start := p.strafe_state_start
-	roll_end: f32
-	roll_t := p.strafe_state_time*6
-	switch p.strafe_state {
-		case .None:
-			roll_end = 0
-		case .Left:
-			roll_end = -0.015
-		case .Right:
-			roll_end = 0.015
-	}
-
-	roll_t = clamp(roll_t, 0, 1)
-	roll_t = 1 - (1-roll_t)*(1-roll_t)
-	p.roll = math.lerp(roll_start, roll_end, roll_t)
-
+	p.roll = easer_update(&p.roll_easer, dt)
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
 	p.vel.xz = linalg.mul(rot, vec4_point(linalg.normalize0(movement)*dt*400)).xz
@@ -351,6 +337,8 @@ game_memory_size :: proc() -> int {
 @(export)
 game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^Game_Memory)(mem)
+
+	create_easers()
 }
 
 @(export)
