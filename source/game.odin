@@ -9,6 +9,7 @@ import sg "sokol/gfx"
 import sglue "sokol/glue"
 import slog "sokol/log"
 import sshape "sokol/shape"
+import tme "core:time"
 
 _ :: fmt
 
@@ -19,7 +20,7 @@ Game_Memory :: struct {
 	objects: [dynamic]Object,
 	player: Player,
 	fov_offset: f32,
-	time: f64,
+	start: tme.Time,
 }
 
 Player :: struct {
@@ -106,6 +107,8 @@ create_easers :: proc() {
 game_init :: proc() {
 	g = new(Game_Memory)
 
+	g.start = tme.now()
+
 	sg.setup({
 		environment = sglue.environment(),
 		logger = { func = slog.func },
@@ -176,10 +179,13 @@ add_box :: proc(pos: Vec3, size: Vec3, color: Color) {
 	})
 }
 
+dt: f32
+time: f64
+
 @export
 game_frame :: proc() {
-	dt := f32(sapp.frame_duration())
-	g.time += sapp.frame_duration()
+	dt = f32(sapp.frame_duration())
+	time = tme.duration_seconds(tme.since(g.start))
 
 	p := &g.player
 	p.vel += {0, -9.82, 0} * dt
@@ -187,76 +193,64 @@ game_frame :: proc() {
 	movement: Vec3
 	
 	if key_held[.Forward] {
-		movement.z += 1
-		easer_set_state(&p.fov_easer, Run_State.Running)
-	} else {
-		easer_set_state(&p.fov_easer, Run_State.Still)
-	}
-
-	g.fov_offset = easer_update(&p.fov_easer, dt)
-	
-	if key_held[.Backward] {
 		movement.z -= 1
 	}
-
-	strafe_state: Strafe_State
+	
+	if key_held[.Backward] {
+		movement.z += 1
+	}
 
 	if key_held[.Left] {
-		movement.x += 1
-		strafe_state = .Left
+		movement.x -= 1
 	}
 
 	if key_held[.Right] {
-		movement.x -= 1
-		strafe_state = .Right
-	}
-
-	if movement.x == 0 {
-		strafe_state = .None
+		movement.x += 1
 	}
 
 	if left_touching {
 		THRESHOLD :: 50
 		movement.x = math.remap(left_touch_offset.x, -THRESHOLD, THRESHOLD, -1, 1)
-
-		if movement.x > 0.5 {
-			strafe_state = .Left
-		} else if movement.x < -0.5 {
-			strafe_state = .Right
-		} else {
-			strafe_state = .None
-		}
-
 		movement.z = math.remap(left_touch_offset.y, -THRESHOLD, THRESHOLD, -1, 1)
 	}
 
+	run_state := movement.z < 0 ? Run_State.Running : Run_State.Still
+	easer_set_state(&p.fov_easer, run_state)
+	g.fov_offset = easer_update(&p.fov_easer, dt)
+
+	strafe_state := Strafe_State.None
+
+	if movement.x > 0.5 {
+		strafe_state = .Right
+	}
+
+	if movement.x < -0.5 {
+		strafe_state = .Left
+	}
+
 	easer_set_state(&p.roll_easer, strafe_state)
+	p.roll = -easer_update(&p.roll_easer, dt)
 
 	if linalg.length(movement) > 1 {
 		movement = linalg.normalize0(movement)	
 	}
-
-	p.roll = easer_update(&p.roll_easer, dt)
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, 0, 0)
 	p.vel.xz = linalg.mul(rot, vec4_point(movement*dt*600)).xz
 	
 	if sapp.mouse_locked() {
 		p.yaw -= mouse_move.x * dt * 0.05
-		p.pitch += mouse_move.y * dt * 0.05
-
+		p.pitch -= mouse_move.y * dt * 0.05
 	} else if mouse_held[.Left] {
 		sapp.lock_mouse(true)
 	}
 
 	if right_touching {
 		p.yaw -= right_touch_diff.x * dt * 0.05
-		p.pitch += right_touch_diff.y * dt * 0.05
+		p.pitch -= right_touch_diff.y * dt * 0.05
 	}
 	
 	p.pitch = clamp(p.pitch, -0.1, 0.2)
-
-	mouse_move = {}
 
 	pass_action := sg.Pass_Action {
 		colors = {
@@ -316,10 +310,10 @@ game_frame :: proc() {
 
 	if grounded {
 		p.jumping = false
-		p.grounded_at = g.time
+		p.grounded_at = time
 	}
 
-	if g.time < key_pressed_time[.Jump] + 0.1 && !p.jumping && g.time < (p.grounded_at + 0.1) {
+	if time < key_pressed_time[.Jump] + 0.1 && !p.jumping && time < (p.grounded_at + 0.1) {
 		p.jumping = true
 		p.vel.y = 4
 	}

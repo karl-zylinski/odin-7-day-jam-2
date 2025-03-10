@@ -53,7 +53,7 @@ process_input :: proc(e: ^sapp.Event) {
 
 			if key != .None {
 				if !key_held[key] {
-					key_pressed_time[key] = g.time
+					key_pressed_time[key] = time
 				}
 
 				key_held[key] = true
@@ -145,4 +145,5 @@ input_init :: proc() {
 
 input_reset :: proc() {
 	key_pressed = {}
+	mouse_move = {}
 }
