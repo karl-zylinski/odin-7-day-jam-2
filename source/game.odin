@@ -199,43 +199,47 @@ game_frame :: proc() {
 		movement.z -= 1
 	}
 
+	strafe_state: Strafe_State
+
 	if key_held[.Left] {
 		movement.x += 1
-		easer_set_state(&p.roll_easer, Strafe_State.Left)
+		strafe_state = .Left
 	}
 
 	if key_held[.Right] {
 		movement.x -= 1
-		easer_set_state(&p.roll_easer, Strafe_State.Right)
+		strafe_state = .Right
 	}
 
 	if movement.x == 0 {
-		easer_set_state(&p.roll_easer, Strafe_State.None)
+		strafe_state = .None
 	}
 
 	if left_touching {
-		THRESHOLD :: 5
-		if left_touch_offset.x < -THRESHOLD {
-			movement.x -= 1
+		THRESHOLD :: 50
+		movement.x = math.remap(left_touch_offset.x, -THRESHOLD, THRESHOLD, -1, 1)
+
+		if movement.x > 0.5 {
+			strafe_state = .Left
+		} else if movement.x < -0.5 {
+			strafe_state = .Right
+		} else {
+			strafe_state = .None
 		}
 
-		if left_touch_offset.x > THRESHOLD {
-			movement.x += 1
-		}
+		movement.z = math.remap(left_touch_offset.y, -THRESHOLD, THRESHOLD, -1, 1)
+	}
 
-		if left_touch_offset.y > THRESHOLD {
-			movement.z += 1
-		}
+	easer_set_state(&p.roll_easer, strafe_state)
 
-		if left_touch_offset.y < -THRESHOLD {
-			movement.z -= 1
-		}
+	if linalg.length(movement) > 1 {
+		movement = linalg.normalize0(movement)	
 	}
 
 	p.roll = easer_update(&p.roll_easer, dt)
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
-	p.vel.xz = linalg.mul(rot, vec4_point(linalg.normalize0(movement)*dt*600)).xz
+	p.vel.xz = linalg.mul(rot, vec4_point(movement*dt*600)).xz
 	
 	if sapp.mouse_locked() {
 		p.yaw -= mouse_move.x * dt * 0.05
