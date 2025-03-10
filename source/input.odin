@@ -1,7 +1,7 @@
 package game
 
 import sapp "sokol/app"
-import "core:fmt"
+import "core:slice"
 
 Key :: enum {
 	None,
@@ -12,17 +12,9 @@ Key :: enum {
 	Jump,
 }
 
+key_pressed: [Key]bool
 key_held: [Key]bool
-key_held_start: [Key]f64
-
-key_hold_duration :: proc(k: Key) -> f64 {
-	if !key_held[k] {
-		return 0
-	}
-
-	val := g.time - key_held_start[k]
-	return val
-}
+key_pressed_time: [Key]f64
 
 key_mapping := #partial #sparse [sapp.Keycode]Key {
 	.W = .Forward,
@@ -54,10 +46,11 @@ process_input :: proc(e: ^sapp.Event) {
 
 			if key != .None {
 				if !key_held[key] {
-					key_held_start[key] = g.time
+					key_pressed_time[key] = g.time
 				}
 
 				key_held[key] = true
+				key_pressed[key] = true
 			}
 			
 			if e.key_code == .F6 {
@@ -106,4 +99,14 @@ process_input :: proc(e: ^sapp.Event) {
 		case .TOUCHES_ENDED:
 			g.touching = false
 	}
+}
+
+input_init :: proc() {
+	for &t in key_pressed_time {
+		t = -1
+	}
+}
+
+input_reset :: proc() {
+	key_pressed = {}
 }

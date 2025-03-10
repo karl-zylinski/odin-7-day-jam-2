@@ -29,6 +29,7 @@ Player :: struct {
 	roll: f32,
 	pos: Vec3,
 	vel: Vec3,
+	grounded_at: f64,
 	jumping: bool,
 	roll_easer: Easer(Strafe_State),
 	fov_easer: Easer(Run_State),
@@ -72,23 +73,30 @@ game_app_default_desc :: proc() -> sapp.Desc {
 
 create_easers :: proc() {
 	g.player.roll_easer = {
-		end_values = {
+		targets = {
 			.None = 0,
 			.Left = -0.015,
 			.Right = 0.015,
 		},
-		duration = 0.3,
+		durations = {
+			.None = 0.2,
+			.Left = 0.2,
+			.Right = 0.2,
+		},
 		ease = proc(t: f32) -> f32 {
 			return 1 - (1 - t) * (1 - t)
 		}
 	}
 
 	g.player.fov_easer = {
-		end_values = {
+		targets = {
 			.Still = 0,
-			.Running = 10,
+			.Running = 7,
 		},
-		duration = 0.4,
+		durations = {
+			.Still = 3,
+			.Running = 0.4,
+		},
 		ease = proc(t: f32) -> f32 {
 			return 1 - (1 - t) * (1 - t) * (1 - t) * (1 - t)
 		},
@@ -98,7 +106,6 @@ create_easers :: proc() {
 @export
 game_init :: proc() {
 	g = new(Game_Memory)
-	game_hot_reloaded(g)
 
 	sg.setup({
 		environment = sglue.environment(),
@@ -133,6 +140,13 @@ game_init :: proc() {
 	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
 	add_box(pos = {0, -1, 10}, size = {5, 1, 5},   color = {0, 255, 0, 255})
 	add_box(pos = {0, 0, 15},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
+
+	game_hot_reloaded(g)
+	input_init()
+}
+
+create_pipeline :: proc() {
+	sg.destroy_pipeline(g.pip)
 
 	g.pip = sg.make_pipeline({
 		shader = sg.make_shader(texcube_shader_desc(sg.query_backend())),
@@ -220,7 +234,7 @@ game_frame :: proc() {
 		colors = {
 			0 = { load_action = .CLEAR, clear_value = { 0.41, 0.68, 0.83, 1 } },
 		},
-}
+	}
 
 	p.pos.y += p.vel.y * dt
 	grounded := false
@@ -272,7 +286,13 @@ game_frame :: proc() {
 		}
 	}
 
-	if key_held[.Jump] && grounded {
+	if grounded {
+		p.jumping = false
+		p.grounded_at = g.time
+	}
+
+	if g.time < key_pressed_time[.Jump] + 0.1 && !p.jumping && g.time < (p.grounded_at + 0.1) {
+		p.jumping = true
 		p.vel.y = 4
 	}
 
@@ -296,7 +316,7 @@ game_frame :: proc() {
 		}
 
 		fs_params := Fs_Params {
-			sun = {f32(math.cos(g.time)*2)*1, 3, f32(math.sin(g.time)*5)*2},
+			sun_position = {100, 120, 0},
 			model_color = color_normalize(o.color),
 		}
 
@@ -309,6 +329,8 @@ game_frame :: proc() {
 	sg.commit()
 
 	free_all(context.temp_allocator)
+
+	input_reset()
 }
 
 PLAYER_SIZE :: Vec3 { 0.4, 1.8, 0.4 }
@@ -350,7 +372,7 @@ game_memory_size :: proc() -> int {
 @(export)
 game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^Game_Memory)(mem)
-
+	create_pipeline()
 	create_easers()
 }
 

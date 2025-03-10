@@ -28,7 +28,7 @@ void main() {
 
 @fs fs
 layout(binding=1) uniform fs_params {
-    vec3 sun;
+    vec3 sun_position;
     vec4 model_color;
 };
 
@@ -39,8 +39,7 @@ in vec3 world_pos;
 out vec4 frag_color;
 
 void main() {
-    vec3 sun_dir = normalize(sun - world_pos);
-    float l = max(dot(normalize(fs_normal), sun_dir)*1.5, 0.4);
+    float l = max(dot(normalize(fs_normal), normalize(sun_position)), 0.4);
     vec3 l3 = vec3(l, l*0.9, l*0.9);
     frag_color = vec4(model_color.rgb*l3,1);
 }

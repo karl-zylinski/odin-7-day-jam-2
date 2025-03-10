@@ -3,8 +3,8 @@ package game
 import "core:math"
 
 Easer :: struct($State_Type: typeid) {
-	end_values: [State_Type]f32,
-	duration: f32,
+	targets: [State_Type]f32,
+	durations: [State_Type]f32,
 	start: f32,
 	cur: f32,
 	timer: f32,
@@ -24,13 +24,14 @@ easer_set_state :: proc(e: ^Easer($State_Type), s: State_Type) {
 
 easer_update :: proc(e: ^Easer($State_Type), dt: f32) -> f32{
 	e.timer += dt
-	end := e.end_values[e.state]
-	t := clamp(e.timer/e.duration, 0, 1)
+	target := e.targets[e.state]
+	duration := e.durations[e.state]
+	t := clamp(e.timer/duration, 0, 1)
 
 	if e.ease != nil {
 		t = e.ease(t)
 	}
 
-	e.cur = math.lerp(e.start, end, t)
+	e.cur = math.lerp(e.start, target, t)
 	return e.cur
 }
