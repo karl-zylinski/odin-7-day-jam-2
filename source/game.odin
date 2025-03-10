@@ -359,6 +359,11 @@ game_frame :: proc() {
 	free_all(context.temp_allocator)
 
 	input_reset()
+
+	if p.pos.y < -20 {
+		game_cleanup()
+		game_init()
+	}
 }
 
 PLAYER_SIZE :: Vec3 { 0.4, 1.8, 0.4 }
