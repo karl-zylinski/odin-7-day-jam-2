@@ -1,6 +1,7 @@
 package game
 
 import sapp "sokol/app"
+import "core:fmt"
 
 Key :: enum {
 	None,
@@ -12,6 +13,16 @@ Key :: enum {
 }
 
 key_held: [Key]bool
+key_held_start: [Key]f64
+
+key_hold_duration :: proc(k: Key) -> f64 {
+	if !key_held[k] {
+		return 0
+	}
+
+	val := g.time - key_held_start[k]
+	return val
+}
 
 key_mapping := #partial #sparse [sapp.Keycode]Key {
 	.W = .Forward,
@@ -35,8 +46,17 @@ process_input :: proc(e: ^sapp.Event) {
 			mouse_move += {e.mouse_dx, e.mouse_dy}
 
 		case .KEY_DOWN:
+			if e.key_repeat == true {
+				break
+			}
+
 			key := key_mapping[e.key_code]
+
 			if key != .None {
+				if !key_held[key] {
+					key_held_start[key] = g.time
+				}
+
 				key_held[key] = true
 			}
 			

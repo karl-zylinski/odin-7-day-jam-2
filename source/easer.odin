@@ -1,0 +1,6 @@
+package game
+
+Easer :: struct {
+
+	
+}

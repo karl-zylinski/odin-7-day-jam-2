@@ -3,6 +3,8 @@ package game
 import "core:math/linalg"
 import "core:slice"
 import "core:math"
+import "core:fmt"
+import "core:math/ease"
 import sapp "sokol/app"
 import sg "sokol/gfx"
 import sglue "sokol/glue"
@@ -18,14 +20,25 @@ Game_Memory :: struct {
 	touch_prev: Vec2,
 	touching: bool,
 	fov_offset: f32,
+	time: f64,
 }
 
 Player :: struct {
 	yaw: f32,
 	pitch: f32,
+	roll: f32,
 	pos: Vec3,
 	vel: Vec3,
 	jumping: bool,
+	strafe_state: Strafe_State,
+	strafe_state_time: f32,
+	strafe_state_start: f32,
+}
+
+Strafe_State :: enum {
+	None,
+	Left,
+	Right,
 }
 
 g: ^Game_Memory
@@ -86,7 +99,8 @@ game_init :: proc() {
 	})
 
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
-	add_box(pos = {-5, 0, 0},   size = {1, 10, 50}, color = {255, 255, 255, 255})
+	add_box(pos = {4, -1, 10}, size = {4, 1, 10}, color = {255, 255, 255, 255})
+	add_box(pos = {-5, 0, 0},  size = {1, 10, 50}, color = {255, 255, 255, 255})
 	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
 	add_box(pos = {0, -1, 10}, size = {5, 1, 5},   color = {0, 255, 0, 255})
 	add_box(pos = {0, 0, 15},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
@@ -123,6 +137,7 @@ add_box :: proc(pos: Vec3, size: Vec3, color: Color) {
 @export
 game_frame :: proc() {
 	dt := f32(sapp.frame_duration())
+	g.time += sapp.frame_duration()
 
 	p := &g.player
 	p.vel += {0, -9.82, 0} * dt
@@ -145,11 +160,48 @@ game_frame :: proc() {
 
 	if key_held[.Left] {
 		movement.x += 1
+		if p.strafe_state != .Left {
+			p.strafe_state = .Left
+			p.strafe_state_start = p.roll
+			p.strafe_state_time = 0
+		}
 	}
 
 	if key_held[.Right] {
 		movement.x -= 1
+
+		if p.strafe_state != .Right {
+			p.strafe_state = .Right
+			p.strafe_state_start = p.roll
+			p.strafe_state_time = 0
+		}
 	}
+
+	if !key_held[.Right] && !key_held[.Left] {
+		if p.strafe_state != .None {
+			p.strafe_state = .None
+			p.strafe_state_start = p.roll
+			p.strafe_state_time = 0
+		}
+	}
+
+	p.strafe_state_time += dt
+	roll_start := p.strafe_state_start
+	roll_end: f32
+	roll_t := p.strafe_state_time*6
+	switch p.strafe_state {
+		case .None:
+			roll_end = 0
+		case .Left:
+			roll_end = -0.015
+		case .Right:
+			roll_end = 0.015
+	}
+
+	roll_t = clamp(roll_t, 0, 1)
+	roll_t = 1 - (1-roll_t)*(1-roll_t)
+	p.roll = math.lerp(roll_start, roll_end, roll_t)
+
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
 	p.vel.xz = linalg.mul(rot, vec4_point(linalg.normalize0(movement)*dt*400)).xz
@@ -169,7 +221,7 @@ game_frame :: proc() {
 		colors = {
 			0 = { load_action = .CLEAR, clear_value = { 0.41, 0.68, 0.83, 1 } },
 		},
-	}
+}
 
 	p.pos.y += p.vel.y * dt
 	grounded := false
@@ -235,7 +287,8 @@ game_frame :: proc() {
 		g.bind.index_buffer = m.ibuf
 		sg.apply_bindings(g.bind)
 		model_transf := create_model_matrix(o.pos, o.rot, o.scl)
-		view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch)
+
+		view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch, p.roll)
 		mvp := create_projection_matrix((60 + g.fov_offset)  * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf()) * view_matrix * model_transf
 
 		vs_params := Vs_Params {
@@ -244,7 +297,7 @@ game_frame :: proc() {
 		}
 
 		fs_params := Fs_Params {
-			sun = {0, 3, 0},
+			sun = {0, 3, f32(math.sin(g.time))*3},
 			model_color = color_normalize(o.color),
 		}
 

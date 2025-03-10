@@ -19,10 +19,12 @@ create_model_matrix :: proc(model_pos: Vec3, rot: Vec3, scl: Vec3 = {1,1,1}) -> 
 	return posm * rotm * sclm
 }
 
-create_view_matrix :: proc(pos: Vec3, yaw: f32, pitch: f32) -> Mat4 {
+create_view_matrix :: proc(pos: Vec3, yaw: f32, pitch: f32, roll: f32) -> Mat4 {
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(yaw * math.TAU, pitch * math.TAU, 0)
 	look := pos + linalg.mul(rot, Vec4{0, 0, 1, 1}).xyz
-	return linalg.matrix4_look_at(pos, look, Vec3{0.0, 1.0, 0.0})
+	roll_rot := linalg.matrix4_from_yaw_pitch_roll_f32(0, 0, roll * math.TAU)
+	up := linalg.mul(rot, linalg.mul(roll_rot, Vec4{0, 1, 0, 1})).xyz
+	return linalg.matrix4_look_at(pos, look, up)
 }
 
 create_projection_matrix :: proc(fovy: f32, render_width, render_height: f32) -> Mat4 {
