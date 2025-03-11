@@ -106,8 +106,7 @@ create_easers :: proc() {
 @export
 game_init :: proc() {
 	g = new(Game_Memory)
-	g.player.yaw = 0.5
-	g.player.pos.z = -3
+	g.player.pos.z = 3
 
 	g.start = tme.now()
 
@@ -139,11 +138,11 @@ game_init :: proc() {
 	})
 
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
-	add_box(pos = {5, -1, 10}, size = {3, 1, 10},  color = {255, 255, 255, 255})
+	add_box(pos = {5, -1, -10}, size = {3, 1, 10},  color = {255, 255, 255, 255})
 	add_box(pos = {-5, 0, 0},  size = {1, 10, 50}, color = {255, 255, 255, 255})
 	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
-	add_box(pos = {0, -1, 10}, size = {5, 1, 5},   color = {0, 255, 0, 255})
-	add_box(pos = {0, 0, 15},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
+	add_box(pos = {-2, -1, -10}, size = {6, 1, 5},   color = {0, 255, 0, 255})
+	add_box(pos = {-3, -1, -25},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
 
 	game_hot_reloaded(g)
 	input_init()
@@ -238,7 +237,7 @@ game_frame :: proc() {
 	}
 
 	rot := linalg.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, 0, 0)
-	p.vel.xz = linalg.mul(rot, vec4_point(movement*dt*600)).xz
+	p.vel.xz = linalg.mul(rot, vec4_point(movement*dt*500)).xz
 	
 	if sapp.mouse_locked() {
 		p.yaw -= mouse_move.x * dt * 0.05
@@ -252,7 +251,7 @@ game_frame :: proc() {
 		p.pitch -= right_touch_diff.y * dt * 0.05
 	}
 	
-	p.pitch = clamp(p.pitch, -0.1, 0.2)
+	p.pitch = clamp(p.pitch, -0.2, 0.2)
 
 	pass_action := sg.Pass_Action {
 		colors = {
@@ -332,7 +331,7 @@ game_frame :: proc() {
 		model_transf := create_model_matrix(o.pos, o.rot, o.scl)
 
 		view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch, p.roll)
-		mvp := create_projection_matrix((60 + g.fov_offset)  * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf()) * view_matrix * model_transf
+		mvp := create_projection_matrix((70 + g.fov_offset)  * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf()) * view_matrix * model_transf
 
 		vs_params := Vs_Params {
 			mvp = mvp,
