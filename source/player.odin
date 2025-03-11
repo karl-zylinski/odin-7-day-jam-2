@@ -3,6 +3,7 @@ package game
 import la "core:math/linalg"
 import "core:math"
 import sapp "sokol/app"
+import "core:fmt"
 
 Player :: struct {
 	yaw: f32,
@@ -15,11 +16,19 @@ Player :: struct {
 	roll_easer: Easer(Strafe_State),
 	fov_easer: Easer(Run_State),
 	state: Player_State,
+	state_time: f32,
 }
 
 Player_State :: enum {
 	Default,
 	Wall_Running,
+}
+
+World_Direction :: enum {
+	Forward,
+	Backward,
+	Left,
+	Right,
 }
 
 Strafe_State :: enum {
@@ -66,7 +75,7 @@ player_on_load :: proc(p: ^Player) {
 }
 
 player_update :: proc(p: ^Player) {
-	p.vel += {0, -9.82, 0} * dt
+	p.vel += {0, -15, 0} * dt
 
 	movement: Vec3
 	
@@ -120,6 +129,8 @@ player_update :: proc(p: ^Player) {
 	p.pos.y += p.vel.y * dt
 	grounded := false
 
+	hit_sides: bit_set[World_Direction]
+
 	for &o in &g.objects {
 		bb, bb_ok := o.collider.?
 
@@ -127,7 +138,7 @@ player_update :: proc(p: ^Player) {
 			continue
 		}
 
-		if obb, coll := bounding_box_get_overlap(player_bounding_box(), bb); coll {
+		if obb, coll := bounding_box_get_overlap(player_bounding_box(p^), bb); coll {
 			sign: f32 = p.pos.y + PLAYER_SIZE.y/2 < (o.pos.y + o.scl.y / 2) ? -1 : 1
 			p.pos.y += (obb.max.y - obb.min.y) * sign
 			p.vel.y = 0
@@ -144,10 +155,23 @@ player_update :: proc(p: ^Player) {
 			continue
 		}
 
-		if obb, coll := bounding_box_get_overlap(player_bounding_box(), bb); coll {
-			sign: f32 = p.pos.x + PLAYER_SIZE.x/2 < (o.pos.x + o.scl.x / 2) ? -1 : 1
-			p.pos.x += (obb.max.x - obb.min.x) * sign
+		sign := (p.pos.x + PLAYER_SIZE.x/2 < o.pos.x + o.scl.x / 2) ? -1 : 1
+		pbb := player_bounding_box(p^)
+		sbb := player_left_right_bounding_box(p^)
+
+		if obb, coll := bounding_box_get_overlap(pbb, bb); coll {
+			p.pos.x += (obb.max.x - obb.min.x) * f32(sign)
 			p.vel.x = 0
+		}
+
+		if bounding_box_check_overlap(sbb, bb) {
+			if sign == -1 {
+				hit_sides += { .Right }
+			}
+
+			if sign == 1 {
+				hit_sides += { .Left }
+			}
 		}
 	}
 
@@ -160,10 +184,32 @@ player_update :: proc(p: ^Player) {
 			continue
 		}
 
-		if obb, coll := bounding_box_get_overlap(player_bounding_box(), bb); coll {
-			sign: f32 = p.pos.z + PLAYER_SIZE.z/2 < (o.pos.z + o.scl.z / 2) ? -1 : 1
-			p.pos.z += (obb.max.z - obb.min.z) * sign
+		sign := (p.pos.z + PLAYER_SIZE.z/2 < o.pos.z + o.scl.z / 2) ? -1 : 1
+		pbb := player_bounding_box(p^)
+		sbb := player_front_back_bounding_box(p^)
+
+		if obb, coll := bounding_box_get_overlap(pbb, bb); coll {
+			p.pos.z += (obb.max.z - obb.min.z) * f32(sign)
 			p.vel.z = 0
+		}
+
+		if bounding_box_check_overlap(sbb, bb) {
+			if sign == -1 {
+				hit_sides += { .Backward }
+			}
+
+			if sign == 1 {
+				hit_sides += { .Forward }
+			}
+		}
+	}
+
+	if p.state == .Default {
+		if grounded && .Left in hit_sides && movement.x < 0 {
+			if p.vel.z < -1 && key_pressed[.Jump] {
+				p.state = .Wall_Running
+				p.state_time = 0
+			}
 		}
 	}
 
@@ -188,15 +234,44 @@ player_update :: proc(p: ^Player) {
 		strafe_state = .Left
 	}
 
+	if p.state == .Wall_Running {
+		p.state_time += dt
+
+		p.vel += {0, 15.1, 0} * dt
+		strafe_state = .Right
+
+		if p.state_time > 0.7 || (.Left not_in hit_sides) {
+			p.state = .Default
+		}
+	}
+
+
 	easer_set_state(&p.roll_easer, strafe_state)
 	p.roll = -easer_update(&p.roll_easer, dt)
 }
 
 PLAYER_SIZE :: Vec3 { 0.6, 1.8, 0.6 }
 
-player_bounding_box :: proc() -> Bounding_Box {
+player_bounding_box :: proc(p: Player) -> Bounding_Box {
 	return {
-		min = g.player.pos - PLAYER_SIZE*0.5,
-		max = g.player.pos + PLAYER_SIZE*0.5,
+		min = p.pos - PLAYER_SIZE*0.5,
+		max = p.pos + PLAYER_SIZE*0.5,
+	}
+}
+
+PLAYER_FRONT_BACK_COLLIDER_SIZE :: Vec3 {PLAYER_SIZE.x * 0.7, PLAYER_SIZE.y * 0.7, PLAYER_SIZE.z * 1.5}
+PLAYER_LEFT_RIGHT_COLLIDER_SIZE :: Vec3 {PLAYER_SIZE.x * 1.5, PLAYER_SIZE.y * 0.7, PLAYER_SIZE.z * 0.7}
+
+player_front_back_bounding_box :: proc(p: Player) -> Bounding_Box {
+	return {
+		min = p.pos - PLAYER_FRONT_BACK_COLLIDER_SIZE*0.5,
+		max = p.pos + PLAYER_FRONT_BACK_COLLIDER_SIZE*0.5,
+	}
+}
+
+player_left_right_bounding_box :: proc(p: Player) -> Bounding_Box {
+	return {
+		min = p.pos - PLAYER_LEFT_RIGHT_COLLIDER_SIZE*0.5,
+		max = p.pos + PLAYER_LEFT_RIGHT_COLLIDER_SIZE*0.5,
 	}
 }

@@ -12,6 +12,10 @@ bounding_box_from_pos_size :: proc(pos: Vec3, size: Vec3) -> Bounding_Box {
 	}
 }
 
+bounding_box_size :: proc(bb: Bounding_Box) -> Vec3 {
+	return bb.max - bb.min
+}
+
 // Check collision between two boxes
 // NOTE: Boxes are defined by two points minimum and maximum
 bounding_box_get_overlap :: proc(b1: Bounding_Box, b2: Bounding_Box) -> (res: Bounding_Box, collision: bool) {
