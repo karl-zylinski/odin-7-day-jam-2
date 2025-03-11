@@ -5,6 +5,8 @@ import "core:math"
 import sapp "sokol/app"
 import "core:fmt"
 
+_ :: fmt
+
 Player :: struct {
 	yaw: f32,
 	pitch: f32,
@@ -13,10 +15,15 @@ Player :: struct {
 	vel: Vec3,
 	grounded_at: f64,
 	jumping: bool,
-	roll_easer: Easer(Strafe_State),
+	roll_easer: Easer(Lean_State),
 	fov_easer: Easer(Run_State),
 	state: Player_State,
 	state_time: f32,
+	eyes_offset: Vec3,
+}
+
+Player_Bob_State :: enum {
+	None, Up, Down,
 }
 
 Player_State :: union #no_nil {
@@ -25,12 +32,15 @@ Player_State :: union #no_nil {
 }
 
 Player_State_Default :: struct {
-
+	bob_easer: Easer(Player_Bob_State),
+	bob_timer: f32,
 }
 
 Player_State_Wall_Running :: struct {
 	wall_side: Direction,
 	need_look_dir: Direction,
+	bob_easer: Easer(Player_Bob_State),
+	bob_timer: f32,
 }
 
 Direction :: enum {
@@ -40,7 +50,7 @@ Direction :: enum {
 	West,
 }
 
-Strafe_State :: enum {
+Lean_State :: enum {
 	None,
 	Left,
 	Right,
@@ -81,11 +91,48 @@ player_on_load :: proc(p: ^Player) {
 			return 1 - (1 - t) * (1 - t) * (1 - t) * (1 - t)
 		},
 	}
+
+	player_set_state(p, Player_State_Default{})
 }
 
 player_set_state :: proc(p: ^Player, s: Player_State) {
 	p.state_time = 0
 	p.state = s
+
+	switch &s in p.state {
+	case Player_State_Default:
+		s.bob_easer = {
+			targets = {
+				.None = 0,
+				.Up = 0.1,
+				.Down = -0.07,
+			},
+			durations = {
+				.None = 1,
+				.Up = 0.2,
+				.Down = 0.18,
+			},
+			ease = proc(t: f32) -> f32 {
+				return 4 * t * (1 - t)
+			},
+		}
+	case Player_State_Wall_Running:
+		s.bob_easer = {
+			targets = {
+				.None = 0,
+				.Up = 0.2,
+				.Down = -0.2,
+			},
+			durations = {
+				.None = 1,
+				.Up = 0.15,
+				.Down = 0.15,
+			},
+			ease = proc(t: f32) -> f32 {
+				return 16 * t * t * (1 - t) * (1 - t)
+			},
+		}
+	}
 }
 
 player_update :: proc(p: ^Player) {
@@ -228,6 +275,24 @@ player_update :: proc(p: ^Player) {
 
 	switch &s in p.state {
 	case Player_State_Default:
+		s.bob_timer -= dt
+
+		if grounded && movement.z < 0 {
+			if s.bob_timer <= 0 {
+				if s.bob_easer.state == .Up {
+					easer_set_state(&s.bob_easer, Player_Bob_State.Down)
+				} else {
+					easer_set_state(&s.bob_easer, Player_Bob_State.Up)
+				}
+
+				s.bob_timer = 0.2
+			}
+		} else {
+			easer_set_state(&s.bob_easer, Player_Bob_State.None)
+		}
+		
+		p.eyes_offset = {0, easer_update(&s.bob_easer, dt), 0}
+
 		if time < key_pressed_time[.Jump] + 0.1 && !p.jumping && time < (p.grounded_at + 0.1) {
 			WALL_RUN_MIN_SPEED :: 1
 
@@ -306,24 +371,44 @@ player_update :: proc(p: ^Player) {
 			}
 
 			p.jumping = true
-			p.vel.y = 4
+			p.vel.y = 5
 		}
 
-		strafe_state := Strafe_State.None
+		Lean_State := Lean_State.None
 
 		camera_rel_vel := la.mul(la.inverse(rot), vec4_from_vec3(p.vel))
 
 		if camera_rel_vel.x > 0.5 {
-			strafe_state = .Right
+			Lean_State = .Right
 		}
 
 		if camera_rel_vel.x < -0.5 {
-			strafe_state = .Left
+			Lean_State = .Left
 		}
 
-		easer_set_state(&p.roll_easer, strafe_state)
+		easer_set_state(&p.roll_easer, Lean_State)
 
 	case Player_State_Wall_Running:
+		s.bob_timer -= dt
+
+		if movement.z < 0 {
+			if s.bob_timer <= 0 {
+				if s.bob_easer.state == .Up {
+					easer_set_state(&s.bob_easer, Player_Bob_State.Down)
+				} else {
+					easer_set_state(&s.bob_easer, Player_Bob_State.Up)
+				}
+
+				s.bob_timer = 0.3
+			}
+		} else {
+			easer_set_state(&s.bob_easer, Player_Bob_State.None)
+		}
+		
+		roll_rot := la.matrix4_from_yaw_pitch_roll_f32(0, 0, 2*p.roll * math.TAU)
+		full_rot := la.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, p.pitch * math.TAU, 0)
+		p.eyes_offset = la.mul(full_rot, la.mul(roll_rot, Vec4{0, easer_update(&s.bob_easer, dt), 0, 1})).xyz
+
 		done := false
 		if s.need_look_dir != look_dir {
 			done = true
@@ -333,11 +418,10 @@ player_update :: proc(p: ^Player) {
 			done = true
 		} else {
 			acc := 15.0 + f32(math.lerp(f32(0.1), -5, smoothstop2(p.state_time/0.7)))
-			fmt.println(acc)
 			p.vel += {0, acc , 0} * dt
 		}
 
-		lean_dir: Strafe_State
+		lean_dir: Lean_State
 
 		switch s.need_look_dir {
 		case .North:
@@ -353,6 +437,7 @@ player_update :: proc(p: ^Player) {
 		easer_set_state(&p.roll_easer, lean_dir)
 
 		if done {
+			p.vel += {3, 3, -1}
 			player_set_state(p, Player_State_Default{})
 		}
 	}

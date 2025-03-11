@@ -92,6 +92,8 @@ game_init :: proc() {
 
 	add_box(pos = {4.5, 2, -12}, size = {10, 5, 1},  color = {255, 255, 255, 255})
 
+	add_box(pos = {0, 0, 50}, size = {50, 1, 80},  color = {255, 230, 230, 255})
+
 	game_hot_reloaded(g)
 	input_init()
 }
@@ -156,7 +158,7 @@ game_frame :: proc() {
 	sg.begin_pass({ action = pass_action, swapchain = sglue.swapchain() })
 	sg.apply_pipeline(g.pip)
 
-	view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch, p.roll)
+	view_matrix := create_view_matrix(p.pos + p.eyes_offset, p.yaw, p.pitch, p.roll)
 	proj_matrix := create_projection_matrix((70 + g.fov_offset) * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf())
 
 	if g.debug_free_fly {
