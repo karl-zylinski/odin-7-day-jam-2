@@ -126,7 +126,7 @@ process_input :: proc(e: ^sapp.Event) {
 				pos := Vec2 {t.pos_x, t.pos_y}
 
 				if pos.x < sapp.widthf()/2 {
-					diff := left_touch_origin - pos
+					diff := pos - left_touch_origin
 					left_touch_offset = diff
 				} else {
 					diff := pos - right_touch_prev
