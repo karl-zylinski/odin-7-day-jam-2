@@ -101,9 +101,9 @@ player_update :: proc(p: ^Player) {
 	}
 
 	rot := la.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, 0, 0)
-	p.vel.xz = la.mul(rot, vec4_point(movement*dt*500)).xz
+	p.vel.xz = la.mul(rot, vec4_point(movement*7)).xz
 	
-	if sapp.mouse_locked() {
+	if sapp.mouse_locked() && !g.debug_free_fly {
 		p.yaw -= mouse_move.x * dt * 0.05
 		p.pitch -= mouse_move.y * dt * 0.05
 	} else if mouse_held[.Left] {
@@ -192,7 +192,7 @@ player_update :: proc(p: ^Player) {
 	p.roll = -easer_update(&p.roll_easer, dt)
 }
 
-PLAYER_SIZE :: Vec3 { 0.4, 1.8, 0.4 }
+PLAYER_SIZE :: Vec3 { 0.6, 1.8, 0.6 }
 
 player_bounding_box :: proc() -> Bounding_Box {
 	return {

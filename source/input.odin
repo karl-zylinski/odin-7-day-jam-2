@@ -9,6 +9,13 @@ Key :: enum {
 	Left,
 	Right,
 	Jump,
+	Debug_Camera,
+	Sprint,
+
+	Debug_Camera_Forward,
+	Debug_Camera_Backward,
+	Debug_Camera_Left,
+	Debug_Camera_Right,
 }
 
 key_pressed: [Key]bool
@@ -20,7 +27,13 @@ key_mapping := #partial #sparse [sapp.Keycode]Key {
 	.S = .Backward,
 	.A = .Left,
 	.D = .Right,
+	.UP = .Debug_Camera_Forward,
+	.DOWN = .Debug_Camera_Backward,
+	.LEFT = .Debug_Camera_Left,
+	.RIGHT = .Debug_Camera_Right,
 	.SPACE = .Jump,
+	.F3 = .Debug_Camera,
+	.LEFT_SHIFT = .Sprint,
 }
 
 Mouse_Button :: enum {

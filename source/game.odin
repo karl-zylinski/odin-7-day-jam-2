@@ -20,6 +20,8 @@ Game_Memory :: struct {
 	player: Player,
 	fov_offset: f32,
 	start: tme.Time,
+	debug_free_fly: bool,
+	debug_camera: Debug_Camera,
 }
 
 g: ^Game_Memory
@@ -132,6 +134,14 @@ game_frame :: proc() {
 	dt = f32(sapp.frame_duration())
 	time = tme.duration_seconds(tme.since(g.start))
 
+	if key_pressed[.Debug_Camera] {
+		g.debug_free_fly = !g.debug_free_fly
+	}
+
+	if g.debug_free_fly {
+		debug_camera_update(&g.debug_camera)
+	}
+
 	p := &g.player
 	player_update(p)
 
@@ -144,6 +154,16 @@ game_frame :: proc() {
 	sg.begin_pass({ action = pass_action, swapchain = sglue.swapchain() })
 	sg.apply_pipeline(g.pip)
 
+	view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch, p.roll)
+	proj_matrix := create_projection_matrix((70 + g.fov_offset) * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf())
+
+	if g.debug_free_fly {
+		c := &g.debug_camera
+		view_matrix = create_view_matrix(c.pos, c.yaw, c.pitch, 0)
+		proj_matrix = create_projection_matrix(70 * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf())
+	}
+	
+
 	for &o in g.objects {
 		m := &g.models[o.model]
 
@@ -152,8 +172,7 @@ game_frame :: proc() {
 		sg.apply_bindings(g.bind)
 		model_transf := create_model_matrix(o.pos, o.rot, o.scl)
 
-		view_matrix := create_view_matrix(p.pos, p.yaw, p.pitch, p.roll)
-		mvp := create_projection_matrix((70 + g.fov_offset)  * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf()) * view_matrix * model_transf
+		mvp := proj_matrix  * view_matrix * model_transf
 
 		vs_params := Vs_Params {
 			mvp = mvp,
@@ -163,6 +182,29 @@ game_frame :: proc() {
 		fs_params := Fs_Params {
 			sun_position = {100, 120, 0},
 			model_color = color_normalize(o.color),
+		}
+
+		sg.apply_uniforms(UB_vs_params, { ptr = &vs_params, size = size_of(vs_params) })
+		sg.apply_uniforms(UB_fs_params, { ptr = &fs_params, size = size_of(fs_params) })
+		sg.draw(0, 36, 1)
+	}
+
+	if g.debug_free_fly {
+		g.bind.vertex_buffers[0] = g.models[0].vbuf
+		g.bind.index_buffer = g.models[0].ibuf
+		sg.apply_bindings(g.bind)
+		model_transf := create_model_matrix(p.pos, {}, PLAYER_SIZE)
+
+		mvp := proj_matrix  * view_matrix * model_transf
+
+		vs_params := Vs_Params {
+			mvp = mvp,
+			model = model_transf,
+		}
+
+		fs_params := Fs_Params {
+			sun_position = {100, 120, 0},
+			model_color = {255, 0, 0, 255},
 		}
 
 		sg.apply_uniforms(UB_vs_params, { ptr = &vs_params, size = size_of(vs_params) })
