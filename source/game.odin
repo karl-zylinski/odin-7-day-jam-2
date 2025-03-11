@@ -106,6 +106,8 @@ create_easers :: proc() {
 @export
 game_init :: proc() {
 	g = new(Game_Memory)
+	g.player.yaw = 0.5
+	g.player.pos.z = -3
 
 	g.start = tme.now()
 
