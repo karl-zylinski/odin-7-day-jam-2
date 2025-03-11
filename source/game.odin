@@ -129,8 +129,8 @@ game_init :: proc() {
 		width = 1,
 		depth = 1,
 		height = 1,
- 		tiles = 1,
- 		random_colors = true,
+		tiles = 1,
+		random_colors = true,
 	})
 
 	append(&g.models, Model {
@@ -157,9 +157,9 @@ create_pipeline :: proc() {
 		layout = {
 			attrs = {
 				ATTR_texcube_pos      = sshape.position_vertex_attr_state(),
-                ATTR_texcube_normal   = sshape.normal_vertex_attr_state(),
-                ATTR_texcube_texcoord = sshape.texcoord_vertex_attr_state(),
-                ATTR_texcube_color0   = sshape.color_vertex_attr_state(),
+				ATTR_texcube_normal   = sshape.normal_vertex_attr_state(),
+				ATTR_texcube_texcoord = sshape.texcoord_vertex_attr_state(),
+				ATTR_texcube_color0   = sshape.color_vertex_attr_state(),
 			},
 		},
 		index_type = .UINT16,
