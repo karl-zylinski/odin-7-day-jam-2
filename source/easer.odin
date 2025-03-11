@@ -35,3 +35,9 @@ easer_update :: proc(e: ^Easer($State_Type), dt: f32) -> f32{
 	e.cur = math.lerp(e.start, target, t)
 	return e.cur
 }
+
+// easings
+
+smoothstop2 :: proc(t: f32) -> f32 {
+	return 1 - (1 - t) * (1 - t)
+}

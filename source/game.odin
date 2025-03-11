@@ -86,9 +86,9 @@ game_init :: proc() {
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
 	add_box(pos = {11, -1, -10}, size = {8, 1, 10},  color = {255, 255, 255, 255})
 	add_box(pos = {-5, 0, 0},  size = {1, 10, 50}, color = {255, 255, 255, 255})
-	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 255, 0, 255})
+	add_box(pos = {5, 0, 0},   size = {1, 5, 5},   color = {255, 200, 255, 255})
 	add_box(pos = {-2, -1, -10}, size = {6, 1, 7},   color = {0, 255, 0, 255})
-	add_box(pos = {-3, -1, -20},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
+	add_box(pos = {-3, 0, -22},  size = {5, 0.2, 5}, color = {0, 255, 255, 255})
 
 	add_box(pos = {4.5, 2, -12}, size = {10, 5, 1},  color = {255, 255, 255, 255})
 
@@ -181,7 +181,7 @@ game_frame :: proc() {
 		}
 
 		fs_params := Fs_Params {
-			sun_position = {100, 120, 0},
+			sun_position = {100, 120, 90},
 			model_color = color_normalize(o.color),
 		}
 

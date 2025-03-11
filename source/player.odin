@@ -125,7 +125,7 @@ player_update :: proc(p: ^Player) {
 	}
 
 	rot := la.matrix4_from_yaw_pitch_roll_f32(p.yaw * math.TAU, 0, 0)
-	p.vel.xz = la.mul(rot, vec4_point(movement*7)).xz
+	p.vel.xz = la.mul(rot, vec4_point(movement*8)).xz
 	
 	if sapp.mouse_locked() && !g.debug_free_fly {
 		p.yaw -= mouse_move.x * dt * 0.05
@@ -309,6 +309,19 @@ player_update :: proc(p: ^Player) {
 			p.vel.y = 4
 		}
 
+		strafe_state := Strafe_State.None
+
+		camera_rel_vel := la.mul(la.inverse(rot), vec4_from_vec3(p.vel))
+
+		if camera_rel_vel.x > 0.5 {
+			strafe_state = .Right
+		}
+
+		if camera_rel_vel.x < -0.5 {
+			strafe_state = .Left
+		}
+
+		easer_set_state(&p.roll_easer, strafe_state)
 
 	case Player_State_Wall_Running:
 		done := false
@@ -319,8 +332,25 @@ player_update :: proc(p: ^Player) {
 		} else if p.state_time > 0.7 {
 			done = true
 		} else {
-			p.vel += {0, 15.1, 0} * dt
+			acc := 15.0 + f32(math.lerp(f32(0.1), -5, smoothstop2(p.state_time/0.7)))
+			fmt.println(acc)
+			p.vel += {0, acc , 0} * dt
 		}
+
+		lean_dir: Strafe_State
+
+		switch s.need_look_dir {
+		case .North:
+			lean_dir = s.wall_side == .West ? .Right : .Left
+		case .East:
+			lean_dir = s.wall_side == .North ? .Right : .Left
+		case .South:
+			lean_dir = s.wall_side == .East ? .Right : .Left
+		case .West:
+			lean_dir = s.wall_side == .South ? .Right : .Left
+		}
+
+		easer_set_state(&p.roll_easer, lean_dir)
 
 		if done {
 			player_set_state(p, Player_State_Default{})
@@ -331,19 +361,7 @@ player_update :: proc(p: ^Player) {
 		p.jumping = true
 		p.vel.y = 4
 	}
-
-	camera_rel_vel := la.mul(la.inverse(rot), vec4_from_vec3(p.vel))
-	strafe_state := Strafe_State.None
-
-	if camera_rel_vel.x > 0.5 {
-		strafe_state = .Right
-	}
-
-	if camera_rel_vel.x < -0.5 {
-		strafe_state = .Left
-	}
-
-	easer_set_state(&p.roll_easer, strafe_state)
+	
 	p.roll = -easer_update(&p.roll_easer, dt)
 }
 
