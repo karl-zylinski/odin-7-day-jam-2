@@ -19,16 +19,25 @@ Player :: struct {
 	state_time: f32,
 }
 
-Player_State :: enum {
-	Default,
-	Wall_Running,
+Player_State :: union #no_nil {
+	Player_State_Default,
+	Player_State_Wall_Running,
 }
 
-World_Direction :: enum {
-	Forward,
-	Backward,
-	Left,
-	Right,
+Player_State_Default :: struct {
+
+}
+
+Player_State_Wall_Running :: struct {
+	wall_side: Direction,
+	need_look_dir: Direction,
+}
+
+Direction :: enum {
+	North,
+	East,
+	South,
+	West,
 }
 
 Strafe_State :: enum {
@@ -74,8 +83,14 @@ player_on_load :: proc(p: ^Player) {
 	}
 }
 
+player_set_state :: proc(p: ^Player, s: Player_State) {
+	p.state_time = 0
+	p.state = s
+}
+
 player_update :: proc(p: ^Player) {
 	p.vel += {0, -15, 0} * dt
+	p.state_time += dt
 
 	movement: Vec3
 	
@@ -129,7 +144,7 @@ player_update :: proc(p: ^Player) {
 	p.pos.y += p.vel.y * dt
 	grounded := false
 
-	hit_sides: bit_set[World_Direction]
+	hit_sides: bit_set[Direction]
 
 	for &o in &g.objects {
 		bb, bb_ok := o.collider.?
@@ -166,11 +181,11 @@ player_update :: proc(p: ^Player) {
 
 		if bounding_box_check_overlap(sbb, bb) {
 			if sign == -1 {
-				hit_sides += { .Right }
+				hit_sides += { .East }
 			}
 
 			if sign == 1 {
-				hit_sides += { .Left }
+				hit_sides += { .West }
 			}
 		}
 	}
@@ -194,21 +209,12 @@ player_update :: proc(p: ^Player) {
 		}
 
 		if bounding_box_check_overlap(sbb, bb) {
-			if sign == -1 {
-				hit_sides += { .Backward }
-			}
-
 			if sign == 1 {
-				hit_sides += { .Forward }
+				hit_sides += { .North }
 			}
-		}
-	}
 
-	if p.state == .Default {
-		if grounded && .Left in hit_sides && movement.x < 0 {
-			if p.vel.z < -1 && key_pressed[.Jump] {
-				p.state = .Wall_Running
-				p.state_time = 0
+			if sign == -1 {
+				hit_sides += { .South }
 			}
 		}
 	}
@@ -216,6 +222,109 @@ player_update :: proc(p: ^Player) {
 	if grounded {
 		p.jumping = false
 		p.grounded_at = time
+	}
+
+	look_dir := player_look_direction(p^)
+
+	switch &s in p.state {
+	case Player_State_Default:
+		if time < key_pressed_time[.Jump] + 0.1 && !p.jumping && time < (p.grounded_at + 0.1) {
+			WALL_RUN_MIN_SPEED :: 1
+
+			if hit_sides != nil {
+				if .West in hit_sides && movement.x < 0 && p.vel.z < -WALL_RUN_MIN_SPEED && look_dir == .North {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .West,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .West in hit_sides && movement.x > 0 && p.vel.z > WALL_RUN_MIN_SPEED && look_dir == .South {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .West,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .East in hit_sides && movement.x > 0 && p.vel.z < -WALL_RUN_MIN_SPEED && look_dir == .North {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .East,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .East in hit_sides && movement.x < 0 && p.vel.z > WALL_RUN_MIN_SPEED && look_dir == .South {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .East,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .North in hit_sides && movement.x > 0 && p.vel.x < -WALL_RUN_MIN_SPEED && look_dir == .West {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .North,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .North in hit_sides && movement.x < 0 && p.vel.x > WALL_RUN_MIN_SPEED && look_dir == .East {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .North,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .South in hit_sides && movement.x > 0 && p.vel.x > WALL_RUN_MIN_SPEED && look_dir == .East {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .South,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+
+				if .South in hit_sides && movement.x < 0 && p.vel.x < -WALL_RUN_MIN_SPEED && look_dir == .West {
+					player_set_state(p, Player_State_Wall_Running {
+						wall_side = .South,
+						need_look_dir = look_dir,
+					})
+
+					break
+				}
+			}
+
+			p.jumping = true
+			p.vel.y = 4
+		}
+
+
+	case Player_State_Wall_Running:
+		done := false
+		if s.need_look_dir != look_dir {
+			done = true
+		} if s.wall_side not_in hit_sides {
+			done = true
+		} else if p.state_time > 0.7 {
+			done = true
+		} else {
+			p.vel += {0, 15.1, 0} * dt
+		}
+
+		if done {
+			player_set_state(p, Player_State_Default{})
+		}
 	}
 
 	if time < key_pressed_time[.Jump] + 0.1 && !p.jumping && time < (p.grounded_at + 0.1) {
@@ -233,18 +342,6 @@ player_update :: proc(p: ^Player) {
 	if camera_rel_vel.x < -0.5 {
 		strafe_state = .Left
 	}
-
-	if p.state == .Wall_Running {
-		p.state_time += dt
-
-		p.vel += {0, 15.1, 0} * dt
-		strafe_state = .Right
-
-		if p.state_time > 0.7 || (.Left not_in hit_sides) {
-			p.state = .Default
-		}
-	}
-
 
 	easer_set_state(&p.roll_easer, strafe_state)
 	p.roll = -easer_update(&p.roll_easer, dt)
@@ -267,6 +364,24 @@ player_front_back_bounding_box :: proc(p: Player) -> Bounding_Box {
 		min = p.pos - PLAYER_FRONT_BACK_COLLIDER_SIZE*0.5,
 		max = p.pos + PLAYER_FRONT_BACK_COLLIDER_SIZE*0.5,
 	}
+}
+
+player_look_direction :: proc(p: Player) -> Direction {
+	y := (p.yaw == 1 ? 1 : la.fract(p.yaw)) * 8.0
+
+	if y >= 1 && y <= 3 {
+		return .West
+	}
+
+	if y >= 3 && y <= 5 {
+		return .South
+	}
+
+	if y >= 5 && y <= 7 {
+		return .East
+	}
+
+	return .North
 }
 
 player_left_right_bounding_box :: proc(p: Player) -> Bounding_Box {
