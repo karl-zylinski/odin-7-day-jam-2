@@ -28,7 +28,7 @@
 				},
 				{
 					"name": "web",
-					"shell_cmd": "python build.py -web -emsdk-path C:\\sdk\\emsdk",
+					"shell_cmd": "python build.py -web -debug -emsdk-path C:\\sdk\\emsdk",
 				},
 			],
 		}
