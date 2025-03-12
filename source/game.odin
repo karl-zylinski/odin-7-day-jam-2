@@ -35,6 +35,7 @@ Quad_Drawer :: struct {
 
 Shadowcaster :: struct {
 	image: sg.Image,
+	depth: sg.Image,
 	attachments: sg.Attachments,
 	pass_action: sg.Pass_Action,
 	pip: sg.Pipeline,
@@ -118,17 +119,30 @@ game_init :: proc() {
 		render_target = true,
 		width = 4096,
 		height = 4096,
-		pixel_format = .DEPTH,
+		pixel_format = .RGBA8,
+		sample_count = 1,
 	})
 
+	g.shadowcaster.depth = sg.make_image({
+		render_target = true,
+		width = 4096,
+		height = 4096,
+		pixel_format = .DEPTH,
+		sample_count = 1,
+	})
+
+
 	g.shadowcaster.attachments = sg.make_attachments({
-		depth_stencil = {
-			image = g.shadowcaster.image,
+		colors = {
+			0 = { image = g.shadowcaster.image },
 		},
+		depth_stencil = { image = g.shadowcaster.depth },
 	})
 
 	g.shadowcaster.pass_action = {
-		depth = { load_action = .CLEAR, clear_value = 1 },
+		colors = {
+			0 = { load_action = .CLEAR, clear_value = { 1, 1, 1, 1 } },
+		},
 	}
 
 	g.shadowcaster.pip = sg.make_pipeline({
@@ -142,14 +156,15 @@ game_init :: proc() {
 			},
 		},
 		index_type = .UINT16,
-		cull_mode = .NONE,
+		cull_mode = .BACK,
+		sample_count = 1,
 		depth = {
 			pixel_format = .DEPTH,
 			compare = .LESS_EQUAL,
 			write_enabled = true,
 		},
 		colors = {
-			0 = { pixel_format = .NONE },
+			0 = { pixel_format = .RGBA8 },
 		},
 	})
 

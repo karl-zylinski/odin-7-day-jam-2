@@ -52,6 +52,9 @@ float remap(float old_value, float old_min, float old_max, float new_min, float 
 	return clamp(((old_value - old_min) / old_range) * new_range + new_min, new_min, new_max);
 }
 
+float decodeDepth(vec4 rgba) {
+    return dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0));
+}
 
 void main() {
 	float l = max(dot(normalize(fs_normal), normalize(sun_position)), 0.4);
@@ -60,8 +63,13 @@ void main() {
 	vec4 world_pos_light_space = shadowcaster_vp * vec4(world_pos, 1);
 	world_pos_light_space.xyz /= world_pos_light_space.w; // Perform the perspective division
 	vec2 shadow_map_coords;
+	#if SOKOL_GLSL
+	shadow_map_coords.x = (world_pos_light_space.x + 1)/2.0;
+	shadow_map_coords.y = (world_pos_light_space.y + 1)/2.0;
+	#else
 	shadow_map_coords.x = world_pos_light_space.x / 2.0 + 0.5f;
 	shadow_map_coords.y = -world_pos_light_space.y / 2.0 + 0.5f;
+	#endif
 	//shadow_map_coords.y = 1-shadow_map_coords.y;
 	float depth_light_space = world_pos_light_space.z;
 
@@ -75,7 +83,7 @@ void main() {
 
 	for (int x = -1; x <= 1; x++) {
 		for (int y = -1; y <= 1; y++) {
-			float shadow_map_depth = texture(sampler2D(tex_shadow_map, smp_shadow_map), shadow_map_coords + TEXEL_SIZE * vec2(x, y)).r;
+			float shadow_map_depth = decodeDepth(texture(sampler2D(tex_shadow_map, smp_shadow_map), shadow_map_coords + TEXEL_SIZE * vec2(x, y)));
 
 			if (depth_light_space - bias > shadow_map_depth) {
 				shadow_counter++;

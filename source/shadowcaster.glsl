@@ -12,19 +12,29 @@ layout(location=1) in vec3 normal;
 layout(location=2) in vec2 texcoord;
 layout(location=3) in vec4 color0;
 
-void main() {
-    float thing = normal.x * texcoord.x * color0.x;
+out vec2 proj_zw;
 
-    gl_Position = mvp * pos + thing*0.000001;
+void main() {
+    gl_Position = mvp * pos;
+    proj_zw = gl_Position.zw;
 }
 @end
 
 @fs fs
 
+vec4 encode_depth(float v) {
+    vec4 enc = vec4(1.0, 255.0, 65025.0, 16581375.0) * v;
+    enc = fract(enc);
+    enc -= enc.yzww * vec4(1.0/255.0,1.0/255.0,1.0/255.0,0.0);
+    return enc;
+}
+
+in vec2 proj_zw;
 out vec4 frag_color;
 
 void main() {
-    frag_color = vec4(1,1,1,1);
+    float depth = proj_zw.x / proj_zw.y;
+    frag_color = encode_depth(depth);
 }
 @end
 
