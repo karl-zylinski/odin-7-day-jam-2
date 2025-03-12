@@ -254,7 +254,7 @@ game_frame :: proc() {
 	time = tme.duration_seconds(tme.since(g.start))
 
 	SUN_SPEED :: 0
-	g.sun_position = {100, 200, 75}
+	g.sun_position = {100, 120, 75}
 
 	if key_pressed[.Debug_Camera] {
 		g.debug_free_fly = !g.debug_free_fly
@@ -278,7 +278,7 @@ game_frame :: proc() {
 
 	pass_action := sg.Pass_Action {
 		colors = {
-			0 = { load_action = .CLEAR, clear_value = { 0.7, 0.48, 0.6, 1 } },
+			0 = { load_action = .CLEAR, clear_value = { 0.7, 0.69, 0.9, 1 } },
 		},
 	}
 
@@ -326,10 +326,11 @@ game_frame :: proc() {
 		debug_draw(proj_matrix, view_matrix, p.pos, PLAYER_LEFT_RIGHT_COLLIDER_SIZE, {0, 0, 255, 255})
 	}
 
-	
-	sg.apply_pipeline(g.quad_drawer.pip)
-	sg.apply_bindings(g.quad_drawer.bind)
-	sg.draw(0, 6, 1)
+	if g.debug_free_fly {
+		sg.apply_pipeline(g.quad_drawer.pip)
+		sg.apply_bindings(g.quad_drawer.bind)
+		sg.draw(0, 6, 1)
+	}
 
 	sg.end_pass()
 	sg.commit()

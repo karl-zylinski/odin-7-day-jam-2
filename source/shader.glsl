@@ -92,7 +92,7 @@ void main() {
 	}
 
 	vec3 light_color = vec3(1.0, 0.95, 1.0);
-	vec3 shadow_color = vec3(0.5, 0.5, 0.7);
+	vec3 shadow_color = vec3(0.55, 0.5, 0.7);
 
 	float distance_to_camera = length(camera_pos - world_pos);
 	float distance_darkening = remap(distance_to_camera, 2, 10, 0, 0.1);
@@ -106,7 +106,7 @@ void main() {
 	light_color = mix(light_color, shadow_color, float(shadow_counter) / float(NUM_SHADOW_SAMPLES));
 	frag_color = vec4(model_color.rgb*l3*light_color,1) - vec4(0, distance_darkening, distance_darkening, 0);
 	frag_color = pow(frag_color, vec4(1.0/2.2));
-	frag_color.rgb = fog_factor * frag_color.rgb + (1-fog_factor)*vec3(0.7, 0.48, 0.6);
+	//frag_color.rgb = fog_factor * frag_color.rgb + (1-fog_factor)*vec3(0.8, 0.8, 0.9);
 	
   //  frag_color = vec4(shadow_map_coords.xy, 0, 1);
 }
