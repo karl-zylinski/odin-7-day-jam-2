@@ -2,6 +2,7 @@ package game
 
 import "core:math"
 import la "core:math/linalg"
+import sapp "sokol/app"
 
 Debug_Camera :: struct {
 	pos: Vec3,
@@ -9,8 +10,11 @@ Debug_Camera :: struct {
 }
 
 debug_camera_update :: proc(c: ^Debug_Camera) {
-	c.yaw -= mouse_move.x * dt * 0.05
-	c.pitch -= mouse_move.y * dt * 0.05
+	if sapp.mouse_locked() {
+		c.yaw -= mouse_move.x * dt * 0.05
+		c.pitch -= mouse_move.y * dt * 0.05
+	}
+	
 	rot := la.matrix4_from_yaw_pitch_roll_f32(c.yaw * math.TAU, c.pitch * math.TAU, 0)
 
 	movement: Vec3

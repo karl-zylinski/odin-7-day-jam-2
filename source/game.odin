@@ -14,18 +14,21 @@ import la "core:math/linalg"
 _ :: fmt
 
 Game_Memory :: struct {
-	pip: sg.Pipeline,
-	bind: sg.Bindings,
-	models: [dynamic]Model,
 	objects: [dynamic]Object,
 	player: Player,
 	fov_offset: f32,
 	start: tme.Time,
 	debug_free_fly: bool,
 	debug_camera: Debug_Camera,
-	shadowcaster: Shadowcaster,
+	default_drawer: Default_Drawer,
+	shadowcaster: Shadowcaster_Drawer,
 	quad_drawer: Quad_Drawer,
 	sun_position: Vec3,
+}
+
+Default_Drawer :: struct {
+	pip: sg.Pipeline,
+	bind: sg.Bindings,
 }
 
 Quad_Drawer :: struct {
@@ -33,7 +36,7 @@ Quad_Drawer :: struct {
 	bind: sg.Bindings,
 }
 
-Shadowcaster :: struct {
+Shadowcaster_Drawer :: struct {
 	image: sg.Image,
 	depth: sg.Image,
 	attachments: sg.Attachments,
@@ -45,7 +48,6 @@ Shadowcaster :: struct {
 g: ^Game_Memory
 
 Object :: struct {
-	model: int,
 	pos: Vec3,
 	rot: Vec3,
 	scl: Vec3,
@@ -96,10 +98,6 @@ game_init :: proc() {
 		random_colors = true,
 	})
 
-	append(&g.models, Model {
-		vbuf = sg.make_buffer(sshape.vertex_buffer_desc(box_buf)),
-		ibuf = sg.make_buffer(sshape.index_buffer_desc(box_buf)),
-	})
 
 	add_box(pos = {0, -1, 0},  size = {10, 1, 10}, color = {255, 255, 255, 255})
 	add_box(pos = {11, -1, -10}, size = {8, 1, 10},  color = {255, 255, 255, 255})
@@ -112,8 +110,8 @@ game_init :: proc() {
 
 	add_box(pos = {0, 0, 50}, size = {50, 1, 80},  color = {255, 230, 230, 255})
 
-	game_hot_reloaded(g)
-	input_init()
+	add_box(pos = {0, 0, 50}, size = {1, 10, 1},  color = {255, 0, 230, 255})
+
 
 	g.shadowcaster.image = sg.make_image({
 		render_target = true,
@@ -131,7 +129,6 @@ game_init :: proc() {
 		sample_count = 1,
 	})
 
-
 	g.shadowcaster.attachments = sg.make_attachments({
 		colors = {
 			0 = { image = g.shadowcaster.image },
@@ -144,6 +141,77 @@ game_init :: proc() {
 			0 = { load_action = .CLEAR, clear_value = { 1, 1, 1, 1 } },
 		},
 	}
+
+	g.default_drawer.bind.vertex_buffers[0] = sg.make_buffer(sshape.vertex_buffer_desc(box_buf))
+	g.default_drawer.bind.index_buffer = sg.make_buffer(sshape.index_buffer_desc(box_buf))
+	g.default_drawer.bind.samplers[SMP_smp_shadow_map] = sg.make_sampler({
+		wrap_u = .CLAMP_TO_BORDER,
+		wrap_v = .CLAMP_TO_BORDER,
+		border_color = .OPAQUE_WHITE,
+	})
+	g.default_drawer.bind.images[IMG_tex_shadow_map] = g.shadowcaster.image
+	g.shadowcaster.bind.vertex_buffers = g.default_drawer.bind.vertex_buffers
+	g.shadowcaster.bind.index_buffer = g.default_drawer.bind.index_buffer
+
+	quad_vertices := [?]f32 {
+		-1,   1,   0,     0, 0,
+		-0.5, 1,   0,     1, 0,
+		-0.5, 0.5, 0,     1, 1,
+		-1,   0.5, 0,     0, 1,
+	}
+
+	quad_indices := [?]u16 {
+		0, 1, 2,
+		0, 2, 3,
+	}
+	
+	g.quad_drawer = {
+		bind = {
+			vertex_buffers = {
+				0 = sg.make_buffer({
+					data = { ptr = &quad_vertices, size = size_of(quad_vertices) },
+				}),
+			},
+			index_buffer = sg.make_buffer({
+				type = .INDEXBUFFER,
+				data = { ptr = &quad_indices, size = size_of(quad_indices) },
+			}),
+			samplers = {
+				SMP_smp = sg.make_sampler({}),
+			},
+			images = {
+				IMG_tex = g.shadowcaster.image,
+			},
+		},
+	}
+
+	game_hot_reloaded(g)
+	input_init()
+}
+
+refresh_pipelines :: proc() {
+	sg.destroy_pipeline(g.default_drawer.pip)
+
+	g.default_drawer.pip = sg.make_pipeline({
+		shader = sg.make_shader(default_lighting_shader_desc(sg.query_backend())),
+		layout = {
+			attrs = {
+				ATTR_default_lighting_pos      = sshape.position_vertex_attr_state(),
+				ATTR_default_lighting_normal   = sshape.normal_vertex_attr_state(),
+				ATTR_default_lighting_texcoord = sshape.texcoord_vertex_attr_state(),
+				ATTR_default_lighting_color0   = sshape.color_vertex_attr_state(),
+			},
+		},
+		index_type = .UINT16,
+		cull_mode = .BACK,
+		depth = {
+			compare = .LESS_EQUAL,
+			write_enabled = true,
+		},
+	})
+
+
+	sg.destroy_pipeline(g.shadowcaster.pip)
 
 	g.shadowcaster.pip = sg.make_pipeline({
 		shader = sg.make_shader(shadowcaster_shader_desc(sg.query_backend())),
@@ -168,76 +236,22 @@ game_init :: proc() {
 		},
 	})
 
-	g.bind.samplers[SMP_smp_shadow_map] = sg.make_sampler({})
+	sg.destroy_pipeline(g.quad_drawer.pip)
 
-	quad_vertices := [?]f32 {
-		-1,   1,   0,     0, 0,
-		-0.5, 1,   0,     1, 0,
-		-0.5, 0.5, 0,     1, 1,
-		-1,   0.5, 0,     0, 1,
-	}
-
-	quad_indices := [?]u16 {
-		0, 1, 2,
-		0, 2, 3,
-	}
-	
-	g.quad_drawer = {
-		pip = sg.make_pipeline({
-			shader = sg.make_shader(quad_textured_shader_desc(sg.query_backend())),
-			index_type = .UINT16,
-			layout = {
-				attrs = {
-					ATTR_quad_textured_position = { format = .FLOAT3 },
-					ATTR_quad_textured_texcoord0 = { format = .FLOAT2 },
-				},
-			},
-		}),
-		bind = {
-			vertex_buffers = {
-				0 = sg.make_buffer({
-					data = { ptr = &quad_vertices, size = size_of(quad_vertices) },
-				}),
-			},
-			index_buffer = sg.make_buffer({
-				type = .INDEXBUFFER,
-				data = { ptr = &quad_indices, size = size_of(quad_indices) },
-			}),
-			samplers = {
-				SMP_smp = sg.make_sampler({}),
-			},
-			images = {
-				IMG_tex = g.shadowcaster.image,
-			},
-		},
-	}
-}
-
-create_pipeline :: proc() {
-	sg.destroy_pipeline(g.pip)
-
-	g.pip = sg.make_pipeline({
-		shader = sg.make_shader(texcube_shader_desc(sg.query_backend())),
+	g.quad_drawer.pip = sg.make_pipeline({
+		shader = sg.make_shader(quad_textured_shader_desc(sg.query_backend())),
+		index_type = .UINT16,
 		layout = {
 			attrs = {
-				ATTR_texcube_pos      = sshape.position_vertex_attr_state(),
-				ATTR_texcube_normal   = sshape.normal_vertex_attr_state(),
-				ATTR_texcube_texcoord = sshape.texcoord_vertex_attr_state(),
-				ATTR_texcube_color0   = sshape.color_vertex_attr_state(),
+				ATTR_quad_textured_position = { format = .FLOAT3 },
+				ATTR_quad_textured_texcoord0 = { format = .FLOAT2 },
 			},
-		},
-		index_type = .UINT16,
-		cull_mode = .BACK,
-		depth = {
-			compare = .LESS_EQUAL,
-			write_enabled = true,
 		},
 	})
 }
 
 add_box :: proc(pos: Vec3, size: Vec3, color: Color) {
 	append(&g.objects, Object {
-		model = 0,
 		pos = pos,
 		scl = size,
 		color = color,
@@ -283,7 +297,7 @@ game_frame :: proc() {
 	}
 
 	sg.begin_pass({ action = pass_action, swapchain = sglue.swapchain() })
-	sg.apply_pipeline(g.pip)
+	sg.apply_pipeline(g.default_drawer.pip)
 
 	view_matrix := create_view_matrix(p.pos + p.eyes_offset, p.yaw, p.pitch, p.roll)
 	proj_matrix := create_projection_matrix((70 + g.fov_offset) * math.RAD_PER_DEG, sapp.widthf(), sapp.heightf())
@@ -318,16 +332,14 @@ game_frame :: proc() {
 	}
 
 	if g.debug_free_fly {
-		g.bind.vertex_buffers[0] = g.models[0].vbuf
-		g.bind.index_buffer = g.models[0].ibuf
-		sg.apply_bindings(g.bind)
+		sg.apply_bindings(g.default_drawer.bind)
 		debug_draw(proj_matrix, view_matrix, p.pos, PLAYER_SIZE, {255, 0, 0, 255})
 		debug_draw(proj_matrix, view_matrix, p.pos, PLAYER_FRONT_BACK_COLLIDER_SIZE, {0, 255, 0, 255})
 		debug_draw(proj_matrix, view_matrix, p.pos, PLAYER_LEFT_RIGHT_COLLIDER_SIZE, {0, 0, 255, 255})
 	}
 
 	if g.debug_free_fly {
-		sg.apply_pipeline(g.quad_drawer.pip)
+	sg.apply_pipeline(g.quad_drawer.pip)
 		sg.apply_bindings(g.quad_drawer.bind)
 		sg.draw(0, 6, 1)
 	}
@@ -346,7 +358,7 @@ game_frame :: proc() {
 }
 
 sun_shadowcaster_view_matrix :: proc() -> Mat4 {
-	return la.matrix4_look_at(g.sun_position + g.player.pos, g.player.pos, Vec3{0, 1, 0})
+	return la.matrix4_look_at(g.sun_position, g.player.pos, Vec3{0, 1, 0})
 }
 
 sun_shadowcaster_proj_matrix :: proc() -> Mat4 {
@@ -354,14 +366,10 @@ sun_shadowcaster_proj_matrix :: proc() -> Mat4 {
 }
 
 draw_world :: proc(view_matrix, proj_matrix, shadowcaster_vp: Mat4) {
-	g.bind.images[IMG_tex_shadow_map] = g.shadowcaster.image
+	g.default_drawer.bind.images[IMG_tex_shadow_map] = g.shadowcaster.image
 
 	for &o in g.objects {
-		m := &g.models[o.model]
-
-		g.bind.vertex_buffers[0] = m.vbuf
-		g.bind.index_buffer = m.ibuf
-		sg.apply_bindings(g.bind)
+		sg.apply_bindings(g.default_drawer.bind)
 		model_transf := create_model_matrix(o.pos, o.rot, o.scl)
 
 		mvp := proj_matrix * view_matrix * model_transf
@@ -387,10 +395,6 @@ draw_world :: proc(view_matrix, proj_matrix, shadowcaster_vp: Mat4) {
 
 draw_world_shadowcaster :: proc(view_matrix, proj_matrix: Mat4) {
 	for &o in g.objects {
-		m := &g.models[o.model]
-
-		g.shadowcaster.bind.vertex_buffers[0] = m.vbuf
-		g.shadowcaster.bind.index_buffer = m.ibuf
 		sg.apply_bindings(g.shadowcaster.bind)
 		model_transf := create_model_matrix(o.pos, o.rot, o.scl)
 
@@ -415,10 +419,7 @@ game_event :: proc(e: ^sapp.Event) {
 @export
 game_cleanup :: proc() {
 	sg.shutdown()
-
-	delete(g.models)
 	delete(g.objects)
-
 	free(g)
 }
 
@@ -435,7 +436,7 @@ game_memory_size :: proc() -> int {
 @(export)
 game_hot_reloaded :: proc(mem: rawptr) {
 	g = (^Game_Memory)(mem)
-	create_pipeline()
+	refresh_pipelines()
 	player_on_load(&g.player)
 }
 

@@ -20,13 +20,18 @@ out vec4 frag_color;
 layout(binding=0) uniform texture2D tex;
 layout(binding=0) uniform sampler smp;
 
+float decode_depth(vec4 rgba) {
+    return dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0));
+}
+
 void main() {
     vec4 c = texture(sampler2D(tex, smp), texcoord);
+    float d = decode_depth(c);
 
-    float d = c.r;
 
-    d = d - 0.9;
+    d -= 0.8;
     d *= 10;
+
     frag_color = vec4(d,d,d,1);
 }
 @end

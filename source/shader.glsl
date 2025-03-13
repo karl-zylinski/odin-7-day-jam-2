@@ -42,7 +42,6 @@ in vec3 fs_normal;
 in vec3 world_pos;
 out vec4 frag_color;
 
-
 float remap(float old_value, float old_min, float old_max, float new_min, float new_max) {
 	float old_range = old_max - old_min;
 	float new_range = new_max - new_min;
@@ -52,7 +51,7 @@ float remap(float old_value, float old_min, float old_max, float new_min, float 
 	return clamp(((old_value - old_min) / old_range) * new_range + new_min, new_min, new_max);
 }
 
-float decodeDepth(vec4 rgba) {
+float decode_depth(vec4 rgba) {
     return dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0));
 }
 
@@ -63,18 +62,16 @@ void main() {
 	vec4 world_pos_light_space = shadowcaster_vp * vec4(world_pos, 1);
 	world_pos_light_space.xyz /= world_pos_light_space.w; // Perform the perspective division
 	vec2 shadow_map_coords;
+
 	#if SOKOL_GLSL
-	shadow_map_coords.x = (world_pos_light_space.x + 1)/2.0;
-	shadow_map_coords.y = (world_pos_light_space.y + 1)/2.0;
+		shadow_map_coords.x = (world_pos_light_space.x + 1)/2.0;
+		shadow_map_coords.y = (world_pos_light_space.y + 1)/2.0;
 	#else
-	shadow_map_coords.x = world_pos_light_space.x / 2.0 + 0.5f;
-	shadow_map_coords.y = -world_pos_light_space.y / 2.0 + 0.5f;
+		shadow_map_coords.x = world_pos_light_space.x / 2.0 + 0.5f;
+		shadow_map_coords.y = -world_pos_light_space.y / 2.0 + 0.5f;
 	#endif
-	//shadow_map_coords.y = 1-shadow_map_coords.y;
+
 	float depth_light_space = world_pos_light_space.z;
-
-	// Bias using normal to make less noisy.
-
 	float bias = 0.00002 * tan(acos(clamp(dot(normalize(fs_normal), normalize(sun_position)), 0, 1))); // Alternatives: float bias = 0.0001; or perhaps float bias = max(0.0001 * (1.0 - dot(normal, l)), 0.00002) + 0.00001;
 	
 	const vec2 TEXEL_SIZE = vec2(1.0f / 4096.0f);
@@ -83,7 +80,7 @@ void main() {
 
 	for (int x = -1; x <= 1; x++) {
 		for (int y = -1; y <= 1; y++) {
-			float shadow_map_depth = decodeDepth(texture(sampler2D(tex_shadow_map, smp_shadow_map), shadow_map_coords + TEXEL_SIZE * vec2(x, y)));
+			float shadow_map_depth = decode_depth(texture(sampler2D(tex_shadow_map, smp_shadow_map), shadow_map_coords + TEXEL_SIZE * vec2(x, y)));
 
 			if (depth_light_space - bias > shadow_map_depth) {
 				shadow_counter++;
@@ -97,9 +94,9 @@ void main() {
 	float distance_to_camera = length(camera_pos - world_pos);
 	float distance_darkening = remap(distance_to_camera, 2, 10, 0, 0.1);
 
-	if (dot(fs_normal, vec3(0, 1, 0)) > 0.5) {
-	   // light_color *= 1 + distance_darkening+0.1;
-	}
+	/*if (dot(fs_normal, vec3(0, 1, 0)) > 0.5) {
+		light_color *= 1 + distance_darkening+0.1;
+	}*/
 
 	float fog_factor = (clamp((50-abs(distance_to_camera))/(50-5), 0, 1)) ;
 
@@ -108,9 +105,9 @@ void main() {
 	frag_color = pow(frag_color, vec4(1.0/2.2));
 	//frag_color.rgb = fog_factor * frag_color.rgb + (1-fog_factor)*vec3(0.8, 0.8, 0.9);
 	
-  //  frag_color = vec4(shadow_map_coords.xy, 0, 1);
+	//frag_color = vec4(shadow_map_coords.xy, 0, 1);
 }
 @end
 
-@program texcube vs fs
+@program default_lighting vs fs
 
