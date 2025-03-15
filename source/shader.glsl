@@ -51,6 +51,7 @@ float remap(float old_value, float old_min, float old_max, float new_min, float 
 	return clamp(((old_value - old_min) / old_range) * new_range + new_min, new_min, new_max);
 }
 
+// from https://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/
 float decode_depth(vec4 rgba) {
     return dot(rgba, vec4(1.0, 1.0/255.0, 1.0/65025.0, 1.0/16581375.0));
 }
@@ -94,18 +95,9 @@ void main() {
 	float distance_to_camera = length(camera_pos - world_pos);
 	float distance_darkening = remap(distance_to_camera, 2, 10, 0, 0.1);
 
-	/*if (dot(fs_normal, vec3(0, 1, 0)) > 0.5) {
-		light_color *= 1 + distance_darkening+0.1;
-	}*/
-
-	float fog_factor = (clamp((50-abs(distance_to_camera))/(50-5), 0, 1)) ;
-
 	light_color = mix(light_color, shadow_color, float(shadow_counter) / float(NUM_SHADOW_SAMPLES));
 	frag_color = vec4(model_color.rgb*l3*light_color,1) - vec4(0, distance_darkening, distance_darkening, 0);
 	frag_color = pow(frag_color, vec4(1.0/2.2));
-	//frag_color.rgb = fog_factor * frag_color.rgb + (1-fog_factor)*vec3(0.8, 0.8, 0.9);
-	
-	//frag_color = vec4(shadow_map_coords.xy, 0, 1);
 }
 @end
 

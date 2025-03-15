@@ -110,7 +110,7 @@ game_init :: proc() {
 
 	add_box(pos = {0, 0, 50}, size = {50, 1, 80},  color = {255, 230, 230, 255})
 
-	add_box(pos = {0, 0, 50}, size = {1, 10, 1},  color = {255, 0, 230, 255})
+	add_box(pos = {0, 0, 50}, size = {1, 10, 1},  color = {255, 50, 230, 255})
 
 
 	g.shadowcaster.image = sg.make_image({

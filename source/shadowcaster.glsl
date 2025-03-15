@@ -22,6 +22,7 @@ void main() {
 
 @fs fs
 
+// from https://aras-p.info/blog/2009/07/30/encoding-floats-to-rgba-the-final/
 vec4 encode_depth(float v) {
     vec4 enc = vec4(1.0, 255.0, 65025.0, 16581375.0) * v;
     enc = fract(enc);
