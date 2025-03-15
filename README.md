@@ -1,3 +1,5 @@
+<img width="500" alt="cover" src="https://github.com/user-attachments/assets/40119f7e-32bd-48a0-899a-ebf682939b53" />
+
 Little Odin + Sokol tech demo. Play in browser: https://zylinski.itch.io/sokol-first-person-shadows-tech-demo
 
 Features:
